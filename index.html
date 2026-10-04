@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dual Launcher - Galaxy Fold Sync</title>
+    <title>Dual Launcher - P2P Galaxy Fold Sync</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,13 +12,11 @@
             theme: {
                 extend: {
                     colors: {
-                        oneui: {
-                            dark: '#08080A',
-                            card: '#16161A',
-                            cardHover: '#202025',
-                            accent: '#0066FF',
-                            accentGlow: 'rgba(0, 102, 255, 0.35)',
-                            border: 'rgba(255, 255, 255, 0.08)'
+                        fold: {
+                            dark: '#050507',
+                            card: '#121216',
+                            border: 'rgba(255, 255, 255, 0.08)',
+                            accent: '#2563eb'
                         }
                     },
                     fontFamily: {
@@ -29,120 +27,116 @@
         }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome & PeerJS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
     <style>
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 9999px; }
-
-        .phone-screen {
-            background-size: cover;
-            background-position: center;
-        }
-        .app-icon {
-            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .app-icon:active {
-            transform: scale(0.88);
-        }
+        .app-icon { transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .app-icon:active { transform: scale(0.85); }
     </style>
 </head>
-<body class="bg-oneui-dark text-white min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
+<body class="bg-fold-dark text-white min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
 
-    <!-- SETUP / ROLE SELECTION OVERLAY -->
-    <div id="setupModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="bg-oneui-card border border-oneui-border w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+    <!-- SETUP & CONNECTION OVERLAY -->
+    <div id="setupModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="bg-fold-card border border-fold-border w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-6">
             <div class="text-center space-y-2">
-                <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30 text-2xl">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 text-2xl">
                     <i class="fa-solid fa-mobile-screen-button text-white"></i>
                 </div>
-                <h2 class="text-xl font-bold tracking-tight">Dual Launcher Sync</h2>
-                <p class="text-xs text-zinc-400">Выберите роль этого телефона для синк-связки</p>
+                <h1 class="text-xl font-bold tracking-tight">Dual Launcher P2P</h1>
+                <p class="text-xs text-zinc-400">Свяжите два телефона в единый режим Galaxy Fold</p>
             </div>
 
-            <div class="space-y-3 pt-2">
+            <!-- Mode selector -->
+            <div id="modeSelection" class="space-y-3">
+                <button onclick="app.prepareHost()" class="w-full py-4 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 font-bold text-sm flex items-center justify-between shadow-lg shadow-blue-600/25 transition-all">
+                    <span class="flex items-center gap-3"><i class="fa-solid fa-wifi text-lg"></i> Создать комнату (Телефон 1)</span>
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+                <button onclick="app.showJoinScreen()" class="w-full py-4 px-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-fold-border font-bold text-sm flex items-center justify-between transition-all">
+                    <span class="flex items-center gap-3"><i class="fa-solid fa-link text-lg"></i> Подключиться (Телефон 2)</span>
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Host screen (shows code) -->
+            <div id="hostSection" class="hidden space-y-4 text-center">
+                <div class="p-4 bg-fold-dark rounded-2xl border border-fold-border space-y-2">
+                    <span class="text-xs text-zinc-400 block">Ваш код подключения:</span>
+                    <div id="hostCodeDisplay" class="text-3xl font-mono font-bold tracking-widest text-blue-400 animate-pulse">----</div>
+                    <p class="text-[11px] text-zinc-500">Введите этот код на втором телефоне</p>
+                </div>
+                <div class="flex items-center justify-center gap-2 text-xs text-zinc-400 py-2">
+                    <i class="fa-solid fa-spinner fa-spin text-blue-500"></i>
+                    <span id="hostStatusText">Ожидание подключения второго телефона...</span>
+                </div>
+                <button onclick="app.resetSetup()" class="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold">Назад</button>
+            </div>
+
+            <!-- Join screen (input code) -->
+            <div id="joinSection" class="hidden space-y-4">
                 <div>
-                    <label class="text-xs font-medium text-zinc-400 block mb-1">Код комнаты синка (одинаковый на обоих телефонах):</label>
-                    <input type="text" id="roomInput" value="fold-alpha-777" class="w-full bg-oneui-dark border border-oneui-border rounded-xl px-4 py-3 text-sm text-center font-mono tracking-wider focus:outline-none focus:border-blue-500">
+                    <label class="text-xs font-medium text-zinc-400 block mb-2">Введите 4-значный код комнаты:</label>
+                    <input type="text" id="joinCodeInput" maxlength="4" placeholder="Напр. 4812" class="w-full bg-fold-dark border border-fold-border rounded-xl px-4 py-3 text-lg text-center font-mono tracking-widest focus:outline-none focus:border-blue-500 uppercase">
                 </div>
-
-                <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="app.initRole('left')" class="p-4 rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/40 hover:border-blue-500 flex flex-col items-center text-center space-y-2 transition-all">
-                        <i class="fa-solid fa-arrow-left text-blue-400 text-lg"></i>
-                        <span class="font-bold text-sm">Телефон 1</span>
-                        <span class="text-[10px] text-zinc-400">Левая половина (Master)</span>
-                    </button>
-                    <button onclick="app.initRole('right')" class="p-4 rounded-2xl bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/40 hover:border-purple-500 flex flex-col items-center text-center space-y-2 transition-all">
-                        <i class="fa-solid fa-arrow-right text-purple-400 text-lg"></i>
-                        <span class="font-bold text-sm">Телефон 2</span>
-                        <span class="text-[10px] text-zinc-400">Правая половина (Slave)</span>
-                    </button>
-                </div>
+                <button onclick="app.connectToHost()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 font-bold rounded-xl text-sm shadow-lg shadow-blue-600/25 transition-all">Подключиться</button>
+                <button onclick="app.resetSetup()" class="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold">Назад</button>
             </div>
-
-            <p class="text-[11px] text-zinc-500 text-center">Откройте эту же ссылку на втором телефоне, введите тот же код комнаты и выберите противоположную роль.</p>
         </div>
     </div>
 
-    <!-- HEADER / STATUS BAR -->
-    <header class="w-full px-4 py-3 border-b border-oneui-border bg-oneui-dark/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between">
+    <!-- HEADER BAR -->
+    <header class="w-full px-4 py-3 border-b border-fold-border bg-fold-dark/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between">
         <div class="flex items-center space-x-2.5">
-            <div id="roleBadgeIcon" class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xs shadow">
-                <i class="fa-solid fa-mobile-screen"></i>
+            <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xs shadow">
+                <i class="fa-solid fa-fold"></i>
             </div>
             <div>
-                <h1 id="headerTitle" class="font-bold text-sm tracking-tight">Dual Launcher</h1>
-                <p id="headerSubtitle" class="text-[10px] text-zinc-400">Ожидание подключения...</p>
+                <h2 id="headerRoleTitle" class="font-bold text-sm tracking-tight">Dual Launcher</h2>
+                <p id="headerConnectionState" class="text-[10px] text-amber-400">Не подключено</p>
             </div>
         </div>
 
         <div class="flex items-center space-x-2">
-            <!-- Connection Indicator -->
-            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-oneui-card border border-oneui-border text-xs">
-                <span class="relative flex h-2.5 w-2.5">
-                  <span id="syncPulse" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span id="syncDot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                </span>
-                <span id="syncText" class="text-zinc-300 text-[11px] font-medium">Поиск...</span>
-            </div>
-
-            <!-- Settings / Wallpaper -->
-            <button onclick="app.openSettings()" class="w-9 h-9 rounded-xl bg-oneui-card hover:bg-oneui-cardHover border border-oneui-border flex items-center justify-center text-zinc-300 transition-colors">
+            <button onclick="app.openSettings()" class="w-9 h-9 rounded-xl bg-fold-card hover:bg-white/10 border border-fold-border flex items-center justify-center text-zinc-300 transition-colors">
                 <i class="fa-solid fa-gear text-xs"></i>
             </button>
         </div>
     </header>
 
-    <!-- MAIN PHONE SCREEN CONTAINER -->
+    <!-- MAIN LAUNCHER WORKSPACE -->
     <main class="flex-1 flex items-center justify-center p-2 sm:p-4 relative">
-        <div id="phoneFrame" class="w-full max-w-md h-[740px] max-h-[82vh] bg-black/60 rounded-3xl border border-oneui-border shadow-2xl backdrop-blur-2xl flex flex-col relative overflow-hidden transition-all">
+        <div id="phoneFrame" class="w-full max-w-md h-[720px] max-h-[82vh] bg-black/60 rounded-3xl border border-fold-border shadow-2xl backdrop-blur-2xl flex flex-col relative overflow-hidden transition-all bg-cover bg-center">
             
-            <!-- System Status Bar -->
-            <div class="h-8 px-5 flex items-center justify-between text-xs text-zinc-300 select-none z-20 bg-black/20 backdrop-blur-sm">
+            <!-- Android Status Bar -->
+            <div class="h-8 px-5 flex items-center justify-between text-xs text-zinc-300 select-none z-20 bg-black/30 backdrop-blur-sm">
                 <span id="clockText" class="font-medium text-[11px]">12:00</span>
                 <div class="flex items-center space-x-2.5 text-[11px]">
-                    <span id="roleIndicatorTag" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold text-[9px]">DEV 1</span>
-                    <i class="fa-solid fa-signal text-[10px]"></i>
-                    <i class="fa-solid fa-wifi text-[10px]"></i>
-                    <span class="font-semibold">92%</span>
+                    <span id="deviceRoleBadge" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold text-[9px]">FOLD</span>
+                    <i class="fa-solid fa-wifi text-[10px] text-emerald-400"></i>
+                    <span class="font-semibold">98%</span>
                     <i class="fa-solid fa-battery-full text-emerald-400"></i>
                 </div>
             </div>
 
-            <!-- Desktop Pages Container -->
+            <!-- Desktop Pages Grid -->
             <div id="desktopContainer" class="flex-1 relative overflow-hidden">
-                <!-- Injected dynamically -->
+                <!-- Dynamically rendered apps -->
             </div>
 
             <!-- Dock Bar -->
             <div class="p-3 pb-4 z-20">
-                <div id="dockContainer" class="max-w-sm mx-auto bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-2.5 flex items-center justify-around shadow-lg">
-                    <!-- Injected dynamically -->
+                <div id="dockContainer" class="max-w-sm mx-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-2.5 flex items-center justify-around shadow-lg">
+                    <!-- Dynamically rendered dock -->
                 </div>
             </div>
 
-            <!-- Android Navigation Bar -->
-            <div class="h-7 flex items-center justify-center space-x-12 text-zinc-400 text-xs bg-black/30 z-20">
+            <!-- Navigation Bar -->
+            <div class="h-7 flex items-center justify-center space-x-12 text-zinc-400 text-xs bg-black/40 z-20">
                 <button onclick="app.goHome()" class="hover:text-white transition-colors py-1 px-4"><i class="fa-solid fa-circle text-[7px]"></i></button>
                 <button onclick="app.prevPage()" class="hover:text-white transition-colors py-1 px-4"><i class="fa-solid fa-caret-left"></i></button>
                 <button onclick="app.nextPage()" class="hover:text-white transition-colors py-1 px-4"><i class="fa-solid fa-caret-right"></i></button>
@@ -150,15 +144,15 @@
         </div>
     </main>
 
-    <!-- APP MODAL WIDGET -->
+    <!-- APP MODAL WINDOW -->
     <div id="appModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
-        <div class="bg-oneui-card border border-oneui-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div class="px-5 py-4 border-b border-oneui-border flex items-center justify-between bg-black/20">
+        <div class="bg-fold-card border border-fold-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="px-5 py-4 border-b border-fold-border flex items-center justify-between bg-black/20">
                 <div class="flex items-center space-x-3">
                     <div id="modalAppIcon" class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md"></div>
                     <div>
                         <h3 id="modalAppTitle" class="font-bold text-sm">Приложение</h3>
-                        <p class="text-[10px] text-zinc-400">Dual Sync Window</p>
+                        <p class="text-[10px] text-zinc-400">Синхронизированное окно Fold</p>
                     </div>
                 </div>
                 <button onclick="app.closeModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white">
@@ -171,7 +165,7 @@
 
     <!-- SETTINGS MODAL -->
     <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
-        <div class="bg-oneui-card border border-oneui-border w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+        <div class="bg-fold-card border border-fold-border w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
             <div class="flex items-center justify-between">
                 <h3 class="font-bold text-base flex items-center gap-2"><i class="fa-solid fa-sliders text-blue-500"></i> Настройки</h3>
                 <button onclick="app.closeSettings()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white">
@@ -180,16 +174,12 @@
             </div>
             <div class="space-y-3 text-xs">
                 <div>
-                    <label class="text-zinc-400 font-medium block mb-1.5">Сменить обои</label>
+                    <label class="text-zinc-400 font-medium block mb-1.5">Обои рабочего стола</label>
                     <div class="grid grid-cols-3 gap-2">
                         <button onclick="app.setWallpaper('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800')" class="h-14 rounded-xl bg-cover border-2 border-blue-500" style="background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300')"></button>
                         <button onclick="app.setWallpaper('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=800')" class="h-14 rounded-xl bg-cover border-2 border-transparent" style="background-image: url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=300')"></button>
                         <button onclick="app.setWallpaper('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=800')" class="h-14 rounded-xl bg-cover border-2 border-transparent" style="background-image: url('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=300')"></button>
                     </div>
-                </div>
-                <div class="pt-2 border-t border-oneui-border flex items-center justify-between">
-                    <span>Текущая роль телефона</span>
-                    <span id="roleSettingText" class="font-bold text-blue-400">Левая половина</span>
                 </div>
             </div>
             <button onclick="app.closeSettings()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-semibold rounded-xl transition-colors">Готово</button>
@@ -199,15 +189,16 @@
     <!-- TOAST NOTIFICATIONS CONTAINER -->
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-    <!-- MAIN SYNC SCRIPT (WebRTC + BroadcastChannel + WebSocket Fallback) -->
+    <!-- MAIN LAUNCHER & PEERJS SYNC LOGIC -->
     <script>
-        class DualLauncherSyncApp {
+        class DualLauncherApp {
             constructor() {
-                this.role = null; // 'left' or 'right'
-                this.room = 'fold-alpha-777';
+                this.peer = null;
+                this.conn = null;
+                this.isHost = false;
+                this.roomCode = '';
                 this.page = 0;
                 this.wallpaper = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop';
-                this.isPeerConnected = false;
                 
                 this.apps = [
                     { id: 'browser', name: 'Интернет', icon: 'fa-globe', color: 'from-blue-500 to-indigo-600', widget: 'browser' },
@@ -220,6 +211,7 @@
                 this.dockApps = ['browser', 'weather', 'notes', 'music'];
 
                 this.initClock();
+                this.render();
             }
 
             initClock() {
@@ -230,87 +222,102 @@
                 }, 1000);
             }
 
-            initRole(role) {
-                this.role = role;
-                const roomInput = document.getElementById('roomInput').value.trim();
-                if (roomInput) this.room = roomInput;
+            generateCode() {
+                return Math.floor(1000 + Math.random() * 9000).toString();
+            }
 
-                document.getElementById('setupModal').classList.add('hidden');
+            prepareHost() {
+                this.isHost = true;
+                this.roomCode = this.generateCode();
                 
-                // Update UI headers
-                const isLeft = role === 'left';
-                document.getElementById('headerTitle').innerText = isLeft ? 'Телефон 1 (Master)' : 'Телефон 2 (Slave)';
-                document.getElementById('headerSubtitle').innerText = `Комната: ${this.room}`;
-                document.getElementById('roleIndicatorTag').innerText = isLeft ? 'DEV 1 (L)' : 'DEV 2 (R)';
-                document.getElementById('roleSettingText').innerText = isLeft ? 'Левая половина (Master)' : 'Правая половина (Slave)';
+                document.getElementById('modeSelection').classList.add('hidden');
+                document.getElementById('hostSection').classList.remove('hidden');
+                document.getElementById('hostCodeDisplay').innerText = this.roomCode;
 
-                this.initSyncNetwork();
-                this.render();
-                this.showToast(`Запущено как ${isLeft ? 'Телефон 1' : 'Телефон 2'}`);
+                // Initialize PeerJS host
+                const peerId = 'dual-fold-' + this.roomCode;
+                this.peer = new Peer(peerId);
+
+                this.peer.on('open', (id) => {
+                    document.getElementById('hostStatusText').innerText = 'Комната открыта! Ожидание второго телефона...';
+                });
+
+                this.peer.on('connection', (connection) => {
+                    this.conn = connection;
+                    this.setupConnectionHandlers();
+                    document.getElementById('setupModal').classList.add('hidden');
+                    this.updateConnectionBadge(true, 'Синхронизировано (P2P)');
+                    this.showToast('Телефон 2 успешно подключился!');
+                });
+
+                this.peer.on('error', (err) => {
+                    this.showToast('Ошибка сети: комната занята или нет интернета');
+                });
             }
 
-            initSyncNetwork() {
-                // 1. Local multi-tab channel for browser testing
-                try {
-                    this.bc = new BroadcastChannel('dual_launcher_' + this.room);
-                    this.bc.onmessage = (event) => {
-                        this.handleIncomingMessage(event.data);
-                    };
-                } catch(e) { console.log('BroadcastChannel not supported'); }
-
-                // 2. Public WebSocket relay sync for two different phones over internet/Wi-Fi
-                try {
-                    // Using a reliable public WebSocket echo / pub-sub signaling server
-                    this.ws = new WebSocket('wss://sockets.space/v1/ws/' + this.room);
-                    this.ws.onopen = () => {
-                        this.setConnectionStatus(true, 'Синхронизировано (WS)');
-                    };
-                    this.ws.onmessage = (event) => {
-                        try {
-                            const data = JSON.parse(event.data);
-                            if (data.sender !== this.clientId) {
-                                this.handleIncomingMessage(data);
-                            }
-                        } catch(err) {}
-                    };
-                    this.ws.onerror = () => {
-                        this.setConnectionStatus(true, 'Локальный синк (Ближний круг)');
-                    };
-                } catch(e) {
-                    this.setConnectionStatus(true, 'Локальный синк');
-                }
-
-                this.clientId = Math.random().toString(36.substring(2, 9));
+            showJoinScreen() {
+                this.isHost = false;
+                document.getElementById('modeSelection').classList.add('hidden');
+                document.getElementById('joinSection').classList.remove('hidden');
             }
 
-            setConnectionStatus(connected, text) {
-                this.isPeerConnected = connected;
-                const dot = document.getElementById('syncDot');
-                const pulse = document.getElementById('syncPulse');
-                const txt = document.getElementById('syncText');
-                if (connected) {
-                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500";
-                    pulse.className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75";
-                    txt.innerText = text;
+            resetSetup() {
+                if (this.peer) {
+                    try { this.peer.destroy(); } catch(e){}
+                }
+                document.getElementById('hostSection').classList.add('hidden');
+                document.getElementById('joinSection').classList.add('hidden');
+                document.getElementById('modeSelection').classList.remove('hidden');
+            }
+
+            connectToHost() {
+                const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+                if (code.length !== 4) {
+                    this.showToast('Введите 4-значный код комнаты');
+                    return;
+                }
+
+                this.roomCode = code;
+                this.showToast('Подключение к комнате ' + code + '...');
+
+                this.peer = new Peer();
+
+                this.peer.on('open', (id) => {
+                    const hostPeerId = 'dual-fold-' + this.roomCode;
+                    this.conn = this.peer.connect(hostPeerId);
+                    
+                    this.conn.on('open', () => {
+                        this.setupConnectionHandlers();
+                        document.getElementById('setupModal').classList.add('hidden');
+                        this.updateConnectionBadge(true, 'Синхронизировано (P2P)');
+                        this.showToast('Успешно подключено к телефону 1!');
+                    });
+
+                    this.conn.on('error', () => {
+                        this.showToast('Не удалось подключиться к комнате');
+                    });
+                });
+            }
+
+            setupConnectionHandlers() {
+                if (!this.conn) return;
+                this.conn.on('data', (data) => {
+                    this.handleIncomingData(data);
+                });
+                this.conn.on('close', () => {
+                    this.updateConnectionBadge(false, 'Соединение разорвано');
+                    this.showToast('Связь со вторым телефоном потеряна');
+                });
+            }
+
+            sendData(action, payload) {
+                if (this.conn && this.conn.open) {
+                    this.conn.send({ action, payload, time: Date.now() });
                 }
             }
 
-            broadcast(action, payload) {
-                const packet = { sender: this.clientId, role: this.role, action, payload, time: Date.now() };
-                
-                // Send via BroadcastChannel
-                if (this.bc) {
-                    try { this.bc.postMessage(packet); } catch(e){}
-                }
-                // Send via WebSocket
-                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    try { this.ws.send(JSON.stringify(packet)); } catch(e){}
-                }
-            }
-
-            handleIncomingMessage(data) {
+            handleIncomingData(data) {
                 if (!data || !data.action) return;
-                
                 switch(data.action) {
                     case 'set_page':
                         this.page = data.payload.page;
@@ -329,11 +336,19 @@
                 }
             }
 
+            updateConnectionBadge(connected, text) {
+                const el = document.getElementById('headerConnectionState');
+                if (el) {
+                    el.innerText = text;
+                    el.className = connected ? "text-[10px] text-emerald-400 font-medium" : "text-[10px] text-amber-400 font-medium";
+                }
+            }
+
             setPage(page, sendSignal = true) {
                 this.page = page;
                 this.render();
                 if (sendSignal) {
-                    this.broadcast('set_page', { page });
+                    this.sendData('set_page', { page });
                 }
             }
 
@@ -356,7 +371,7 @@
 
             launchApp(appId) {
                 this.openAppModal(appId, true);
-                this.broadcast('launch_app', { appId });
+                this.sendData('launch_app', { appId });
             }
 
             openAppModal(appId, sendSignal = true) {
@@ -375,13 +390,17 @@
 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+
+                if (sendSignal) {
+                    this.sendData('launch_app', { appId });
+                }
             }
 
             closeModal(sendSignal = true) {
                 document.getElementById('appModal').classList.remove('flex');
                 document.getElementById('appModal').classList.add('hidden');
                 if (sendSignal) {
-                    this.broadcast('close_modal', {});
+                    this.sendData('close_modal', {});
                 }
             }
 
@@ -398,7 +417,7 @@
             setWallpaper(url) {
                 this.wallpaper = url;
                 this.render();
-                this.broadcast('set_wallpaper', { wallpaper: url });
+                this.sendData('set_wallpaper', { wallpaper: url });
                 this.showToast('Обои синхронизированы');
             }
 
@@ -406,7 +425,7 @@
                 const frame = document.getElementById('phoneFrame');
                 frame.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0.85)), url('${this.wallpaper}')`;
 
-                // Desktop Apps
+                // Desktop Grid
                 const desktop = document.getElementById('desktopContainer');
                 const appsPerPage = 6;
                 const startIdx = this.page * appsPerPage;
@@ -426,7 +445,7 @@
                 });
                 html += `</div>`;
 
-                // Page dots
+                // Pagination indicators
                 html += `<div class="flex items-center justify-center space-x-2 pb-2">`;
                 for (let i = 0; i < 2; i++) {
                     const active = i === this.page ? 'w-6 bg-blue-500' : 'w-1.5 bg-white/30';
@@ -435,7 +454,7 @@
                 html += `</div></div>`;
                 desktop.innerHTML = html;
 
-                // Dock Apps
+                // Dock
                 const dock = document.getElementById('dockContainer');
                 let dockHtml = '';
                 this.dockApps.forEach(id => {
@@ -454,17 +473,17 @@
             getWidgetContent(type) {
                 switch(type) {
                     case 'browser':
-                        return `<div class="space-y-3"><div class="bg-oneui-dark p-2.5 rounded-xl border border-oneui-border flex items-center space-x-2"><i class="fa-solid fa-globe text-blue-400 text-xs"></i><span class="text-xs font-mono text-zinc-300">https://dual-sync.org</span></div><p class="text-xs text-zinc-300 leading-relaxed">Двусторонний браузер синхронизирует вкладки между обоими телефонами в реальном времени.</p></div>`;
+                        return `<div class="space-y-3"><div class="bg-fold-dark p-2.5 rounded-xl border border-fold-border flex items-center space-x-2"><i class="fa-solid fa-globe text-blue-400 text-xs"></i><span class="text-xs font-mono text-zinc-300">https://dual-fold.sync</span></div><p class="text-xs text-zinc-300 leading-relaxed">Двусторонний браузер синкуется между двумя телефонами в реальном времени.</p></div>`;
                     case 'weather':
-                        return `<div class="text-center space-y-3 py-2"><i class="fa-solid fa-cloud-sun text-5xl text-amber-400 animate-bounce"></i><div class="text-3xl font-bold">+24°C</div><div class="text-xs text-zinc-400">Солнечно • Синхронизировано</div></div>`;
+                        return `<div class="text-center space-y-3 py-2"><i class="fa-solid fa-cloud-sun text-5xl text-amber-400 animate-bounce"></i><div class="text-3xl font-bold">+24°C</div><div class="text-xs text-zinc-400">Солнечно • Синхронизированный Fold</div></div>`;
                     case 'notes':
-                        return `<div class="space-y-3"><textarea class="w-full h-36 bg-oneui-dark border border-oneui-border rounded-xl p-3 text-sm text-zinc-200 focus:outline-none resize-none" placeholder="Общая заметка телефонов...">Синхронизированная заметка с Fold-эмулятора.</textarea></div>`;
+                        return `<div class="space-y-3"><textarea class="w-full h-36 bg-fold-dark border border-fold-border rounded-xl p-3 text-sm text-zinc-200 focus:outline-none resize-none" placeholder="Общая заметка...">Заметка на общем экране...</textarea></div>`;
                     case 'music':
-                        return `<div class="text-center space-y-3"><div class="w-28 h-28 mx-auto rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white text-3xl shadow-xl"><i class="fa-solid fa-compact-disc animate-spin" style="animation-duration: 6s;"></i></div><div class="font-bold text-sm">Ambient Galaxy</div><div class="text-xs text-zinc-400">Sync Audio Stream</div></div>`;
+                        return `<div class="text-center space-y-3"><div class="w-28 h-28 mx-auto rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white text-3xl shadow-xl"><i class="fa-solid fa-compact-disc animate-spin" style="animation-duration: 6s;"></i></div><div class="font-bold text-sm">Galaxy Ambient</div><div class="text-xs text-zinc-400">Sync Audio Stream</div></div>`;
                     case 'calculator':
-                        return `<div class="space-y-2"><div class="bg-oneui-dark p-3 rounded-xl font-mono text-right text-xl font-bold">128,000</div><div class="grid grid-cols-4 gap-1.5 text-xs font-bold"><button class="p-2.5 bg-white/5 rounded-lg">C</button><button class="p-2.5 bg-white/5 rounded-lg">()</button><button class="p-2.5 bg-white/5 rounded-lg">%</button><button class="p-2.5 bg-blue-600 rounded-lg text-white">÷</button></div></div>`;
+                        return `<div class="space-y-2"><div class="bg-fold-dark p-3 rounded-xl font-mono text-right text-xl font-bold">512,000</div><div class="grid grid-cols-4 gap-1.5 text-xs font-bold"><button class="p-2.5 bg-white/5 rounded-lg">C</button><button class="p-2.5 bg-white/5 rounded-lg">()</button><button class="p-2.5 bg-white/5 rounded-lg">%</button><button class="p-2.5 bg-blue-600 rounded-lg text-white">÷</button></div></div>`;
                     default:
-                        return `<p class="text-xs text-zinc-400">Модуль запущен.</p>`;
+                        return `<p class="text-xs text-zinc-400">Приложение запущено.</p>`;
                 }
             }
 
@@ -472,7 +491,7 @@
                 const c = document.getElementById('toastContainer');
                 if (!c) return;
                 const t = document.createElement('div');
-                t.className = "bg-oneui-card border border-oneui-border text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-2 animate-in fade-in slide-in-from-bottom-3 duration-200";
+                t.className = "bg-fold-card border border-fold-border text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-2 animate-in fade-in slide-in-from-bottom-3 duration-200";
                 t.innerHTML = `<i class="fa-solid fa-circle-check text-blue-400"></i><span>${msg}</span>`;
                 c.appendChild(t);
                 setTimeout(() => t.remove(), 2500);
@@ -481,7 +500,7 @@
 
         let app;
         window.onload = () => {
-            app = new DualLauncherSyncApp();
+            app = new DualLauncherApp();
         };
     </script>
 </body>
