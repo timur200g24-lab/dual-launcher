@@ -1,506 +1,281 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dual Launcher - P2P Galaxy Fold Sync</title>
-    <!-- Tailwind CSS -->
+    <title>Dual Launcher P2P</title>
+    <!-- Подключаем Tailwind CSS для красивого и адаптивного дизайна -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        fold: {
-                            dark: '#050507',
-                            card: '#121216',
-                            border: 'rgba(255, 255, 255, 0.08)',
-                            accent: '#2563eb'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome & PeerJS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+    <!-- Подключаем PeerJS для прямого соединения между телефонами -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 9999px; }
-        .app-icon { transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        .app-icon:active { transform: scale(0.85); }
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            overscroll-behavior: none;
+        }
+        .app-icon {
+            transition: transform 0.1s;
+        }
+        .app-icon:active {
+            transform: scale(0.92);
+        }
     </style>
 </head>
-<body class="bg-fold-dark text-white min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
+<body class="bg-neutral-950 text-white h-[100dvh] w-screen overflow-hidden flex flex-col justify-between font-sans">
 
-    <!-- SETUP & CONNECTION OVERLAY -->
-    <div id="setupModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="bg-fold-card border border-fold-border w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-6">
-            <div class="text-center space-y-2">
-                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 text-2xl">
-                    <i class="fa-solid fa-mobile-screen-button text-white"></i>
-                </div>
-                <h1 class="text-xl font-bold tracking-tight">Dual Launcher P2P</h1>
-                <p class="text-xs text-zinc-400">Свяжите два телефона в единый режим Galaxy Fold</p>
+    <!-- ЭКРАН ПОДКЛЮЧЕНИЯ (Связка 2 телефонов) -->
+    <div id="connection-screen" class="fixed inset-0 bg-neutral-950 z-50 flex flex-col items-center justify-center p-6">
+        <div class="w-full max-w-xs bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4">
+            <h1 class="text-xl font-bold tracking-wide">Dual Launcher</h1>
+            <p class="text-xs text-neutral-400 text-center">Свяжите два телефона в единый экран (как Fold)</p>
+
+            <div id="status-box" class="w-full bg-neutral-950 p-3 rounded-xl border border-neutral-800 text-center text-xs text-amber-400 font-mono">
+                Инициализация связи...
             </div>
 
-            <!-- Mode selector -->
-            <div id="modeSelection" class="space-y-3">
-                <button onclick="app.prepareHost()" class="w-full py-4 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 font-bold text-sm flex items-center justify-between shadow-lg shadow-blue-600/25 transition-all">
-                    <span class="flex items-center gap-3"><i class="fa-solid fa-wifi text-lg"></i> Создать комнату (Телефон 1)</span>
-                    <i class="fa-solid fa-chevron-right text-xs"></i>
+            <!-- Режим создания комнаты -->
+            <div id="host-section" class="w-full flex flex-col gap-2">
+                <button onclick="createRoom()" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium py-3 rounded-xl transition text-sm">
+                    Создать комнату (Телефон 1)
                 </button>
-                <button onclick="app.showJoinScreen()" class="w-full py-4 px-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-fold-border font-bold text-sm flex items-center justify-between transition-all">
-                    <span class="flex items-center gap-3"><i class="fa-solid fa-link text-lg"></i> Подключиться (Телефон 2)</span>
-                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                <div id="room-code-display" class="hidden text-center text-lg font-mono tracking-widest bg-neutral-950 py-2 rounded-lg border border-neutral-800 text-emerald-400">
+                    ----
+                </div>
+            </div>
+
+            <div class="w-full flex items-center gap-2 my-1">
+                <div class="h-[1px] bg-neutral-800 flex-1"></div>
+                <span class="text-[10px] text-neutral-500 uppercase">или</span>
+                <div class="h-[1px] bg-neutral-800 flex-1"></div>
+            </div>
+
+            <!-- Режим подключения к комнате -->
+            <div id="join-section" class="w-full flex flex-col gap-2">
+                <input type="text" id="join-code-input" placeholder="Введите код комнаты" maxlength="4" class="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-center text-sm font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500 uppercase">
+                <button onclick="joinRoom()" class="w-full bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-white font-medium py-3 rounded-xl transition text-sm">
+                    Подключиться (Телефон 2)
                 </button>
-            </div>
-
-            <!-- Host screen (shows code) -->
-            <div id="hostSection" class="hidden space-y-4 text-center">
-                <div class="p-4 bg-fold-dark rounded-2xl border border-fold-border space-y-2">
-                    <span class="text-xs text-zinc-400 block">Ваш код подключения:</span>
-                    <div id="hostCodeDisplay" class="text-3xl font-mono font-bold tracking-widest text-blue-400 animate-pulse">----</div>
-                    <p class="text-[11px] text-zinc-500">Введите этот код на втором телефоне</p>
-                </div>
-                <div class="flex items-center justify-center gap-2 text-xs text-zinc-400 py-2">
-                    <i class="fa-solid fa-spinner fa-spin text-blue-500"></i>
-                    <span id="hostStatusText">Ожидание подключения второго телефона...</span>
-                </div>
-                <button onclick="app.resetSetup()" class="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold">Назад</button>
-            </div>
-
-            <!-- Join screen (input code) -->
-            <div id="joinSection" class="hidden space-y-4">
-                <div>
-                    <label class="text-xs font-medium text-zinc-400 block mb-2">Введите 4-значный код комнаты:</label>
-                    <input type="text" id="joinCodeInput" maxlength="4" placeholder="Напр. 4812" class="w-full bg-fold-dark border border-fold-border rounded-xl px-4 py-3 text-lg text-center font-mono tracking-widest focus:outline-none focus:border-blue-500 uppercase">
-                </div>
-                <button onclick="app.connectToHost()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 font-bold rounded-xl text-sm shadow-lg shadow-blue-600/25 transition-all">Подключиться</button>
-                <button onclick="app.resetSetup()" class="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold">Назад</button>
             </div>
         </div>
     </div>
 
-    <!-- HEADER BAR -->
-    <header class="w-full px-4 py-3 border-b border-fold-border bg-fold-dark/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between">
-        <div class="flex items-center space-x-2.5">
-            <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xs shadow">
-                <i class="fa-solid fa-fold"></i>
-            </div>
-            <div>
-                <h2 id="headerRoleTitle" class="font-bold text-sm tracking-tight">Dual Launcher</h2>
-                <p id="headerConnectionState" class="text-[10px] text-amber-400">Не подключено</p>
-            </div>
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ ЛАУНЧЕРА -->
+    <header class="w-full px-4 py-3 flex items-center justify-between border-b border-neutral-900 bg-neutral-950/80 backdrop-blur shrink-0">
+        <div class="flex items-center gap-2">
+            <span id="role-badge" class="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-[10px] font-medium uppercase">Устройство</span>
+            <span id="connection-status-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
         </div>
-
-        <div class="flex items-center space-x-2">
-            <button onclick="app.openSettings()" class="w-9 h-9 rounded-xl bg-fold-card hover:bg-white/10 border border-fold-border flex items-center justify-center text-zinc-300 transition-colors">
-                <i class="fa-solid fa-gear text-xs"></i>
-            </button>
+        <div class="flex items-center gap-2">
+            <button onclick="toggleFullscreen()" class="px-3 py-1 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-neutral-300 hover:bg-neutral-800 active:scale-95 transition">Фуллскрин</button>
+            <button onclick="location.reload()" class="px-3 py-1 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-neutral-300 hover:bg-neutral-800 active:scale-95 transition">Сброс</button>
         </div>
     </header>
 
-    <!-- MAIN LAUNCHER WORKSPACE -->
-    <main class="flex-1 flex items-center justify-center p-2 sm:p-4 relative">
-        <div id="phoneFrame" class="w-full max-w-md h-[720px] max-h-[82vh] bg-black/60 rounded-3xl border border-fold-border shadow-2xl backdrop-blur-2xl flex flex-col relative overflow-hidden transition-all bg-cover bg-center">
-            
-            <!-- Android Status Bar -->
-            <div class="h-8 px-5 flex items-center justify-between text-xs text-zinc-300 select-none z-20 bg-black/30 backdrop-blur-sm">
-                <span id="clockText" class="font-medium text-[11px]">12:00</span>
-                <div class="flex items-center space-x-2.5 text-[11px]">
-                    <span id="deviceRoleBadge" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold text-[9px]">FOLD</span>
-                    <i class="fa-solid fa-wifi text-[10px] text-emerald-400"></i>
-                    <span class="font-semibold">98%</span>
-                    <i class="fa-solid fa-battery-full text-emerald-400"></i>
-                </div>
+    <!-- РАБОЧИЙ СТОЛ (СЕТКА ПРИЛОЖЕНИЙ) -->
+    <main class="flex-1 w-full max-w-md mx-auto p-4 flex flex-col justify-between overflow-y-auto">
+        <div>
+            <!-- Индикатор страниц (точки) -->
+            <div class="flex justify-center gap-1.5 mb-6">
+                <div id="dot-0" class="w-6 h-1.5 rounded-full bg-indigo-500 transition-all duration-300"></div>
+                <div id="dot-1" class="w-1.5 h-1.5 rounded-full bg-neutral-700 transition-all duration-300"></div>
             </div>
 
-            <!-- Desktop Pages Grid -->
-            <div id="desktopContainer" class="flex-1 relative overflow-hidden">
-                <!-- Dynamically rendered apps -->
+            <!-- Страницы рабочих столов -->
+            <div id="desktop-pages" class="grid grid-cols-4 gap-4">
+                <!-- Страница 1 (Заполняется через JS) -->
             </div>
+        </div>
 
-            <!-- Dock Bar -->
-            <div class="p-3 pb-4 z-20">
-                <div id="dockContainer" class="max-w-sm mx-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-2.5 flex items-center justify-around shadow-lg">
-                    <!-- Dynamically rendered dock -->
-                </div>
+        <!-- Док-бар внизу -->
+        <div class="w-full bg-neutral-900/60 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-3 flex justify-around items-center mt-4 shrink-0">
+            <div onclick="openApp('Телефон')" class="flex flex-col items-center gap-1 cursor-pointer app-icon">
+                <div class="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-xl shadow-lg">📞</div>
+                <span class="text-[10px] text-neutral-400">Телефон</span>
             </div>
-
-            <!-- Navigation Bar -->
-            <div class="h-7 flex items-center justify-center space-x-12 text-zinc-400 text-xs bg-black/40 z-20">
-                <button onclick="app.goHome()" class="hover:text-white transition-colors py-1 px-4"><i class="fa-solid fa-circle text-[7px]"></i></button>
-                <button onclick="app.prevPage()" class="hover:text-white transition-colors py-1 px-4"><i class="fa-solid fa-caret-left"></i></button>
-                <button onclick="app.nextPage()" class="hover:text-white transition-colors py-1 px-4"><i class="fa-solid fa-caret-right"></i></button>
+            <div onclick="openApp('Сообщения')" class="flex flex-col items-center gap-1 cursor-pointer app-icon">
+                <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-xl shadow-lg">💬</div>
+                <span class="text-[10px] text-neutral-400">Чаты</span>
+            </div>
+            <div onclick="openApp('Браузер')" class="flex flex-col items-center gap-1 cursor-pointer app-icon">
+                <div class="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center text-xl shadow-lg">🌐</div>
+                <span class="text-[12px] text-neutral-400">Браузер</span>
+            </div>
+            <div onclick="openApp('Настройки')" class="flex flex-col items-center gap-1 cursor-pointer app-icon">
+                <div class="w-12 h-12 bg-purple-600 rounded-2xl flex items-center justify-center text-xl shadow-lg">⚙️️</div>
+                <span class="text-[10px] text-neutral-400">Настройки</span>
             </div>
         </div>
     </main>
 
-    <!-- APP MODAL WINDOW -->
-    <div id="appModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
-        <div class="bg-fold-card border border-fold-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div class="px-5 py-4 border-b border-fold-border flex items-center justify-between bg-black/20">
-                <div class="flex items-center space-x-3">
-                    <div id="modalAppIcon" class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md"></div>
-                    <div>
-                        <h3 id="modalAppTitle" class="font-bold text-sm">Приложение</h3>
-                        <p class="text-[10px] text-zinc-400">Синхронизированное окно Fold</p>
-                    </div>
-                </div>
-                <button onclick="app.closeModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white">
-                    <i class="fa-solid fa-xmark text-xs"></i>
-                </button>
-            </div>
-            <div id="modalAppContent" class="p-5 flex-1 overflow-y-auto"></div>
+    <!-- МОДАЛЬНОЕ ОКНО ОТКРЫТОГО ПРИЛОЖЕНИЯ -->
+    <div id="app-modal" class="fixed inset-0 bg-neutral-950/90 backdrop-blur-md z-40 hidden flex flex-col p-4 animate-in fade-in duration-200">
+        <div class="flex items-center justify-between pb-3 border-b border-neutral-900">
+            <h2 id="modal-title-text" class="text-sm font-bold text-white">Приложение</h2>
+            <button onclick="closeApp()" class="px-3 py-1 bg-neutral-900 rounded-lg text-xs border border-neutral-800">Закрыть</button>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center text-center p-6">
+            <div id="modal-icon" class="text-5xl mb-4">📱</div>
+            <p id="modal-desc" class="text-xs text-neutral-400">Интерфейс приложения синкован на оба экрана Fold.</p>
         </div>
     </div>
 
-    <!-- SETTINGS MODAL -->
-    <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
-        <div class="bg-fold-card border border-fold-border w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between">
-                <h3 class="font-bold text-base flex items-center gap-2"><i class="fa-solid fa-sliders text-blue-500"></i> Настройки</h3>
-                <button onclick="app.closeSettings()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white">
-                    <i class="fa-solid fa-xmark text-xs"></i>
-                </button>
-            </div>
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="text-zinc-400 font-medium block mb-1.5">Обои рабочего стола</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="app.setWallpaper('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800')" class="h-14 rounded-xl bg-cover border-2 border-blue-500" style="background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300')"></button>
-                        <button onclick="app.setWallpaper('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=800')" class="h-14 rounded-xl bg-cover border-2 border-transparent" style="background-image: url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=300')"></button>
-                        <button onclick="app.setWallpaper('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=800')" class="h-14 rounded-xl bg-cover border-2 border-transparent" style="background-image: url('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=300')"></button>
-                    </div>
-                </div>
-            </div>
-            <button onclick="app.closeSettings()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-semibold rounded-xl transition-colors">Готово</button>
-        </div>
-    </div>
-
-    <!-- TOAST NOTIFICATIONS CONTAINER -->
-    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
-
-    <!-- MAIN LAUNCHER & PEERJS SYNC LOGIC -->
     <script>
-        class DualLauncherApp {
-            constructor() {
-                this.peer = null;
-                this.conn = null;
-                this.isHost = false;
-                this.roomCode = '';
-                this.page = 0;
-                this.wallpaper = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop';
-                
-                this.apps = [
-                    { id: 'browser', name: 'Интернет', icon: 'fa-globe', color: 'from-blue-500 to-indigo-600', widget: 'browser' },
-                    { id: 'weather', name: 'Погода', icon: 'fa-cloud-sun', color: 'from-amber-400 to-orange-500', widget: 'weather' },
-                    { id: 'notes', name: 'Заметки', icon: 'fa-note-sticky', color: 'from-yellow-400 to-amber-600', widget: 'notes' },
-                    { id: 'gallery', name: 'Галерея', icon: 'fa-images', color: 'from-purple-500 to-pink-600', widget: 'gallery' },
-                    { id: 'music', name: 'Музыка', icon: 'fa-music', color: 'from-emerald-400 to-teal-600', widget: 'music' },
-                    { id: 'calculator', name: 'Калькулятор', icon: 'fa-calculator', color: 'from-zinc-600 to-zinc-800', widget: 'calculator' }
-                ];
-                this.dockApps = ['browser', 'weather', 'notes', 'music'];
+        let peer = null;
+        let conn = null;
+        let myRole = '';
+        let currentPage = 0;
 
-                this.initClock();
-                this.render();
-            }
+        // Данные рабочего стола
+        const apps = [
+            { name: "Камера", icon: "📷", color: "bg-rose-600" },
+            { name: "Галерея", icon: "🖼️", color: "bg-orange-600" },
+            { name: "YouTube", icon: "▶️", color: "bg-red-600" },
+            { name: "Музыка", icon: "🎵", color: "bg-violet-600" },
+            { name: "Карты", icon: "🗺️", color: "bg-green-600" },
+            { name: "Заметки", icon: "📝", color: "bg-yellow-600" },
+            { name: "Калькулятор", icon: "🔢", color: "bg-cyan-600" },
+            { name: "Игра", icon: "🎮", color: "bg-indigo-600" },
+        ];
 
-            initClock() {
-                setInterval(() => {
-                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const el = document.getElementById('clockText');
-                    if (el) el.innerText = timeStr;
-                }, 1000);
-            }
+        function renderDesktop() {
+            const container = document.getElementById('desktop-pages');
+            container.innerHTML = '';
+            apps.forEach((app, index) => {
+                const el = document.createElement('div');
+                el.className = "flex flex-col items-center gap-1.5 cursor-pointer app-icon";
+                el.onclick = () => {
+                    openApp(app.name, app.icon);
+                    sendData({ type: 'OPEN_APP', name: app.name, icon: app.icon });
+                };
+                el.innerHTML = `
+                    <div class="w-16 h-16 ${app.color} rounded-2xl flex items-center justify-center text-2xl shadow-lg">${app.icon}</div>
+                    <span class="text-[11px] text-neutral-300 font-medium">${app.name}</span>
+                `;
+                container.appendChild(el);
+            });
 
-            generateCode() {
-                return Math.floor(1000 + Math.random() * 9000).toString();
-            }
+            // Обновляем индикаторы точек
+            document.getElementById('dot-0').className = currentPage === 0 ? "w-6 h-1.5 rounded-full bg-indigo-500 transition-all duration-300" : "w-1.5 h-1.5 rounded-full bg-neutral-700 transition-all duration-300";
+            document.getElementById('dot-1').className = currentPage === 1 ? "w-6 h-1.5 rounded-full bg-indigo-500 transition-all duration-300" : "w-1.5 h-1.5 rounded-full bg-neutral-700 transition-all duration-300";
+        }
 
-            prepareHost() {
-                this.isHost = true;
-                this.roomCode = this.generateCode();
-                
-                document.getElementById('modeSelection').classList.add('hidden');
-                document.getElementById('hostSection').classList.remove('hidden');
-                document.getElementById('hostCodeDisplay').innerText = this.roomCode;
+        // Инициализация PeerJS с четырехзначным кодом
+        function initPeer(customId = null) {
+            const statusBox = document.getElementById('status-box');
+            peer = customId ? new Peer(customId) : new Peer();
 
-                // Initialize PeerJS host
-                const peerId = 'dual-fold-' + this.roomCode;
-                this.peer = new Peer(peerId);
-
-                this.peer.on('open', (id) => {
-                    document.getElementById('hostStatusText').innerText = 'Комната открыта! Ожидание второго телефона...';
-                });
-
-                this.peer.on('connection', (connection) => {
-                    this.conn = connection;
-                    this.setupConnectionHandlers();
-                    document.getElementById('setupModal').classList.add('hidden');
-                    this.updateConnectionBadge(true, 'Синхронизировано (P2P)');
-                    this.showToast('Телефон 2 успешно подключился!');
-                });
-
-                this.peer.on('error', (err) => {
-                    this.showToast('Ошибка сети: комната занята или нет интернета');
-                });
-            }
-
-            showJoinScreen() {
-                this.isHost = false;
-                document.getElementById('modeSelection').classList.add('hidden');
-                document.getElementById('joinSection').classList.remove('hidden');
-            }
-
-            resetSetup() {
-                if (this.peer) {
-                    try { this.peer.destroy(); } catch(e){}
+            peer.on('open', (id) => {
+                if (customId) {
+                    myRole = 'Телефон 1 (Хост)';
+                    document.getElementById('role-badge').innerText = 'Хост';
+                    document.getElementById('room-code-display').innerText = id;
+                    document.getElementById('room-code-display').classList.remove('hidden');
+                    statusBox.innerText = 'Комната создана! Введите этот код на 2-м телефоне.';
+                    statusBox.className = "w-full bg-neutral-950 p-3 rounded-xl border border-neutral-800 text-center text-xs text-emerald-400 font-mono";
+                } else {
+                    myRole = 'Телефон 2 (Клиент)';
+                    document.getElementById('role-badge').innerText = 'Клиент';
+                    statusBox.innerText = 'Готов к подключению. Введите код комнаты.';
+                    statusBox.className = "w-full bg-neutral-950 p-3 rounded-xl border border-neutral-800 text-center text-xs text-indigo-400 font-mono";
                 }
-                document.getElementById('hostSection').classList.add('hidden');
-                document.getElementById('joinSection').classList.add('hidden');
-                document.getElementById('modeSelection').classList.remove('hidden');
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+
+            peer.on('error', (err) => {
+                statusBox.innerText = 'Ошибка связи: проверьте код или интернет.';
+                statusBox.className = "w-full bg-neutral-950 p-3 rounded-xl border border-neutral-800 text-center text-xs text-red-400 font-mono";
+            });
+        }
+
+        function createRoom() {
+            // Генерируем случайный 4-значный код комнаты
+            const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+            initPeer(randomCode);
+        }
+
+        function joinRoom() {
+            const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+            if (!code || code.length < 4) {
+                alert('Введите корректный 4-значный код комнаты!');
+                return;
             }
+            const statusBox = document.getElementById('status-box');
+            statusBox.innerText = 'Подключение к комнате ' + code + '...';
 
-            connectToHost() {
-                const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
-                if (code.length !== 4) {
-                    this.showToast('Введите 4-значный код комнаты');
-                    return;
-                }
+            conn = peer.connect(code);
+            setupConnection();
+        }
 
-                this.roomCode = code;
-                this.showToast('Подключение к комнате ' + code + '...');
+        function setupConnection() {
+            conn.on('open', () => {
+                document.getElementById('connection-screen').style.display = 'none';
+                document.getElementById('connection-status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]";
+                console.log('Успешно подключено к другому телефону!');
+            });
 
-                this.peer = new Peer();
+            conn.on('data', (data) => {
+                handleIncomingData(data);
+            });
 
-                this.peer.on('open', (id) => {
-                    const hostPeerId = 'dual-fold-' + this.roomCode;
-                    this.conn = this.peer.connect(hostPeerId);
-                    
-                    this.conn.on('open', () => {
-                        this.setupConnectionHandlers();
-                        document.getElementById('setupModal').classList.add('hidden');
-                        this.updateConnectionBadge(true, 'Синхронизировано (P2P)');
-                        this.showToast('Успешно подключено к телефону 1!');
-                    });
+            conn.on('close', () => {
+                alert('Соединение с другим телефоном разорвано.');
+                location.reload();
+            });
+        }
 
-                    this.conn.on('error', () => {
-                        this.showToast('Не удалось подключиться к комнате');
-                    });
-                });
-            }
-
-            setupConnectionHandlers() {
-                if (!this.conn) return;
-                this.conn.on('data', (data) => {
-                    this.handleIncomingData(data);
-                });
-                this.conn.on('close', () => {
-                    this.updateConnectionBadge(false, 'Соединение разорвано');
-                    this.showToast('Связь со вторым телефоном потеряна');
-                });
-            }
-
-            sendData(action, payload) {
-                if (this.conn && this.conn.open) {
-                    this.conn.send({ action, payload, time: Date.now() });
-                }
-            }
-
-            handleIncomingData(data) {
-                if (!data || !data.action) return;
-                switch(data.action) {
-                    case 'set_page':
-                        this.page = data.payload.page;
-                        this.render();
-                        break;
-                    case 'launch_app':
-                        this.openAppModal(data.payload.appId, false);
-                        break;
-                    case 'close_modal':
-                        this.closeModal(false);
-                        break;
-                    case 'set_wallpaper':
-                        this.wallpaper = data.payload.wallpaper;
-                        this.render();
-                        break;
-                }
-            }
-
-            updateConnectionBadge(connected, text) {
-                const el = document.getElementById('headerConnectionState');
-                if (el) {
-                    el.innerText = text;
-                    el.className = connected ? "text-[10px] text-emerald-400 font-medium" : "text-[10px] text-amber-400 font-medium";
-                }
-            }
-
-            setPage(page, sendSignal = true) {
-                this.page = page;
-                this.render();
-                if (sendSignal) {
-                    this.sendData('set_page', { page });
-                }
-            }
-
-            nextPage() {
-                let p = this.page + 1;
-                if (p > 1) p = 0;
-                this.setPage(p);
-            }
-
-            prevPage() {
-                let p = this.page - 1;
-                if (p < 0) p = 1;
-                this.setPage(p);
-            }
-
-            goHome() {
-                this.setPage(0);
-                this.closeModal();
-            }
-
-            launchApp(appId) {
-                this.openAppModal(appId, true);
-                this.sendData('launch_app', { appId });
-            }
-
-            openAppModal(appId, sendSignal = true) {
-                const appObj = this.apps.find(a => a.id === appId);
-                if (!appObj) return;
-
-                const modal = document.getElementById('appModal');
-                const modalIcon = document.getElementById('modalAppIcon');
-                const modalTitle = document.getElementById('modalAppTitle');
-                const modalContent = document.getElementById('modalAppContent');
-
-                modalIcon.className = `w-10 h-10 rounded-2xl bg-gradient-to-tr ${appObj.color} flex items-center justify-center text-white text-lg shadow-md`;
-                modalIcon.innerHTML = `<i class="fa-solid ${appObj.icon}"></i>`;
-                modalTitle.innerText = appObj.name;
-                modalContent.innerHTML = this.getWidgetContent(appObj.widget);
-
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-
-                if (sendSignal) {
-                    this.sendData('launch_app', { appId });
-                }
-            }
-
-            closeModal(sendSignal = true) {
-                document.getElementById('appModal').classList.remove('flex');
-                document.getElementById('appModal').classList.add('hidden');
-                if (sendSignal) {
-                    this.sendData('close_modal', {});
-                }
-            }
-
-            openSettings() {
-                document.getElementById('settingsModal').classList.remove('hidden');
-                document.getElementById('settingsModal').classList.add('flex');
-            }
-
-            closeSettings() {
-                document.getElementById('settingsModal').classList.remove('flex');
-                document.getElementById('settingsModal').classList.add('hidden');
-            }
-
-            setWallpaper(url) {
-                this.wallpaper = url;
-                this.render();
-                this.sendData('set_wallpaper', { wallpaper: url });
-                this.showToast('Обои синхронизированы');
-            }
-
-            render() {
-                const frame = document.getElementById('phoneFrame');
-                frame.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0.85)), url('${this.wallpaper}')`;
-
-                // Desktop Grid
-                const desktop = document.getElementById('desktopContainer');
-                const appsPerPage = 6;
-                const startIdx = this.page * appsPerPage;
-                const pageApps = this.apps.slice(startIdx, startIdx + appsPerPage);
-
-                let html = `<div class="absolute inset-0 p-5 flex flex-col justify-between">`;
-                html += `<div class="grid grid-cols-3 gap-5 pt-3">`;
-                pageApps.forEach(app => {
-                    html += `
-                        <div onclick="app.launchApp('${app.id}')" class="flex flex-col items-center group cursor-pointer">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white text-xl shadow-lg app-icon border border-white/20">
-                                <i class="fa-solid ${app.icon}"></i>
-                            </div>
-                            <span class="text-xs mt-1.5 text-zinc-200 font-medium tracking-tight text-center truncate w-full">${app.name}</span>
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-
-                // Pagination indicators
-                html += `<div class="flex items-center justify-center space-x-2 pb-2">`;
-                for (let i = 0; i < 2; i++) {
-                    const active = i === this.page ? 'w-6 bg-blue-500' : 'w-1.5 bg-white/30';
-                    html += `<div onclick="app.setPage(${i})" class="h-1.5 rounded-full transition-all cursor-pointer ${active}"></div>`;
-                }
-                html += `</div></div>`;
-                desktop.innerHTML = html;
-
-                // Dock
-                const dock = document.getElementById('dockContainer');
-                let dockHtml = '';
-                this.dockApps.forEach(id => {
-                    const a = this.apps.find(x => x.id === id);
-                    if (a) {
-                        dockHtml += `
-                            <div onclick="app.launchApp('${a.id}')" class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${a.color} flex items-center justify-center text-white text-lg shadow-md app-icon cursor-pointer border border-white/20">
-                                <i class="fa-solid ${a.icon}"></i>
-                            </div>
-                        `;
-                    }
-                });
-                dock.innerHTML = dockHtml;
-            }
-
-            getWidgetContent(type) {
-                switch(type) {
-                    case 'browser':
-                        return `<div class="space-y-3"><div class="bg-fold-dark p-2.5 rounded-xl border border-fold-border flex items-center space-x-2"><i class="fa-solid fa-globe text-blue-400 text-xs"></i><span class="text-xs font-mono text-zinc-300">https://dual-fold.sync</span></div><p class="text-xs text-zinc-300 leading-relaxed">Двусторонний браузер синкуется между двумя телефонами в реальном времени.</p></div>`;
-                    case 'weather':
-                        return `<div class="text-center space-y-3 py-2"><i class="fa-solid fa-cloud-sun text-5xl text-amber-400 animate-bounce"></i><div class="text-3xl font-bold">+24°C</div><div class="text-xs text-zinc-400">Солнечно • Синхронизированный Fold</div></div>`;
-                    case 'notes':
-                        return `<div class="space-y-3"><textarea class="w-full h-36 bg-fold-dark border border-fold-border rounded-xl p-3 text-sm text-zinc-200 focus:outline-none resize-none" placeholder="Общая заметка...">Заметка на общем экране...</textarea></div>`;
-                    case 'music':
-                        return `<div class="text-center space-y-3"><div class="w-28 h-28 mx-auto rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white text-3xl shadow-xl"><i class="fa-solid fa-compact-disc animate-spin" style="animation-duration: 6s;"></i></div><div class="font-bold text-sm">Galaxy Ambient</div><div class="text-xs text-zinc-400">Sync Audio Stream</div></div>`;
-                    case 'calculator':
-                        return `<div class="space-y-2"><div class="bg-fold-dark p-3 rounded-xl font-mono text-right text-xl font-bold">512,000</div><div class="grid grid-cols-4 gap-1.5 text-xs font-bold"><button class="p-2.5 bg-white/5 rounded-lg">C</button><button class="p-2.5 bg-white/5 rounded-lg">()</button><button class="p-2.5 bg-white/5 rounded-lg">%</button><button class="p-2.5 bg-blue-600 rounded-lg text-white">÷</button></div></div>`;
-                    default:
-                        return `<p class="text-xs text-zinc-400">Приложение запущено.</p>`;
-                }
-            }
-
-            showToast(msg) {
-                const c = document.getElementById('toastContainer');
-                if (!c) return;
-                const t = document.createElement('div');
-                t.className = "bg-fold-card border border-fold-border text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-2 animate-in fade-in slide-in-from-bottom-3 duration-200";
-                t.innerHTML = `<i class="fa-solid fa-circle-check text-blue-400"></i><span>${msg}</span>`;
-                c.appendChild(t);
-                setTimeout(() => t.remove(), 2500);
+        function sendData(data) {
+            if (conn && conn.open) {
+                conn.send(data);
             }
         }
 
-        let app;
+        function handleIncomingData(data) {
+            if (data.type === 'OPEN_APP') {
+                openAppLocally(data.name, data.icon);
+            } else if (data.type === 'CLOSE_APP') {
+                closeAppLocally();
+            }
+        }
+
+        function openApp(name, icon = '📱') {
+            openAppLocally(name, icon);
+        }
+
+        function openAppLocally(name, icon) {
+            document.getElementById('modal-title-text').innerText = name;
+            document.getElementById('modal-icon').innerText = icon;
+            document.getElementById('app-modal').classList.remove('hidden');
+        }
+
+        function closeApp() {
+            closeAppLocally();
+            sendData({ type: 'CLOSE_APP' });
+        }
+
+        function closeAppLocally() {
+            document.getElementById('app-modal').classList.add('hidden');
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // Автоматически запускаем инициализацию Peer при загрузке
         window.onload = () => {
-            app = new DualLauncherApp();
+            initPeer();
+            renderDesktop();
         };
     </script>
 </body>
